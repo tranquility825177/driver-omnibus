@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OmniBus Driver</title>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #333; color: white; }
+        button { padding: 20px 40px; font-size: 20px; font-weight: bold; border-radius: 50px; border: none; cursor: pointer; }
+        .start { background: #4caf50; color: white; }
+        .stop { background: #f44336; color: white; display: none; }
+        #status { margin-top: 20px; font-size: 14px; color: #aaa; text-align: center; }
+    </style>
+</head>
+<body>
+
+    <h2>Driver Broadcast Panel</h2>
+    <button id="startBtn" class="start">Start Broadcasting</button>
+    <button id="stopBtn" class="stop">Stop</button>
+    <div id="status">Waiting to start...</div>
+
+    <script>
+        let ws;
+        let watchId;
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const statusText = document.getElementById('status');
+
+        // IMPORTANT: We will change this URL in Step 2!
+        const SERVER_URL = "wss://nonpursuant-liana-lustral.ngrok-free.dev/ws";
+
+        startBtn.onclick = () => {
+            // 1. Connect to the server
+            ws = new WebSocket(SERVER_URL);
+            
+            ws.onopen = () => {
+                statusText.innerHTML = "🟢 Connected to Server. Getting GPS...";
+                startBtn.style.display = 'none';
+                stopBtn.style.display = 'block';
+
+                // 2. Start tracking the phone's real GPS continuously
+                if ("geolocation" in navigator) {
+                    // watchPosition automatically fires every time the phone physically moves
+                    watchId = navigator.geolocation.watchPosition(
+                        (position) => {
+                            const payload = {
+                                bus_id: "GU_BUS_1",
+                                lat: position.coords.latitude,
+                                lng: position.coords.longitude
+                            };
+                            // 3. Send the real coordinates to the server
+                            ws.send(JSON.stringify(payload));
+                            statusText.innerHTML = `📡 Broadcasting Live: <br>${payload.lat.toFixed(5)}, ${payload.lng.toFixed(5)}`;
+                        },
+                        (error) => { statusText.innerHTML = "🔴 GPS Error. Please allow location access."; },
+                        { enableHighAccuracy: true, maximumAge: 0 }
+                    );
+                }
+            };
+            
+            ws.onclose = () => { statusText.innerHTML = "🔴 Disconnected from server."; };
+        };
+
+        stopBtn.onclick = () => {
+            navigator.geolocation.clearWatch(watchId);
+            ws.close();
+            startBtn.style.display = 'block';
+            stopBtn.style.display = 'none';
+            statusText.innerHTML = "Broadcast stopped.";
+        };
+    </script>
+</body>
+</html>
